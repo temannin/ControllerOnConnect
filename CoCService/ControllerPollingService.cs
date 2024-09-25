@@ -1,6 +1,5 @@
 
 using System.Timers;
-using SharpDX.DirectInput;
 
 namespace CoCService;
 
@@ -8,11 +7,17 @@ public sealed class ControllerPollingService : BackgroundService
 {
     private readonly System.Timers.Timer _timer;
     private readonly ILogger<ControllerPollingService> _logger;
+    private readonly ControllerFinder _finder;
+    private readonly AutomationRunner _runner;
 
     public ControllerPollingService(
+        ControllerFinder finder,
+        AutomationRunner runner,
         ILogger<ControllerPollingService> logger)
     {
         _logger = logger;
+        _finder = finder;
+        _runner = runner;
         _timer = new System.Timers.Timer(1000) { AutoReset = true };
         _timer.Elapsed += OnTimerElapsed;
     }
@@ -21,17 +26,15 @@ public sealed class ControllerPollingService : BackgroundService
     {
         try
         {
-            var directInput = new DirectInput();
-            var joystickGuid = Guid.Empty;
-
-            foreach (var deviceInstance in directInput.GetDevices(DeviceClass.GameControl, DeviceEnumerationFlags.AttachedOnly))
+            if (_finder.ControllerIsConnected)
             {
-                joystickGuid = deviceInstance.InstanceGuid;
+                _logger.LogInformation("Controller is connected. Running automations.");
+                _runner.Trigger();
             }
-
-            _logger.LogInformation(joystickGuid == Guid.Empty
-                ? "No controller connected"
-                : "A controller is connected");
+            else
+            {
+                _logger.LogDebug("No controller is connected");
+            }
         }
         catch (Exception ex)
         {
